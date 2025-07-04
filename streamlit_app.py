@@ -12,17 +12,14 @@ import pandas as pd
 import numpy as np
 import os
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_community.document_loaders import TextLoader
-from langchain_text_splitters import CharacterTextSplitter
-
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
 
 st.set_page_config(page_title="📚 AI-Powered Book Discovery", layout="wide")
 st.title("📚 AI-Powered Book Discovery Platform")
 st.write("Find books based on semantic meaning and emotional tone.")
 
 
-@st.cache_data
 def load_books():
     books = pd.read_csv("books_with_emotions.csv")
     books["large_thumbnail"] = books["thumbnail"].fillna("") + "&fife=w800"
@@ -35,18 +32,25 @@ def load_books():
 
 books = load_books()
 
+
 @st.cache_resource
-def load_chroma():
+def load_faiss():
     embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-    # Load prebuilt Chroma vector store only
-    return Chroma(
-        collection_name="book_collection",
-        embedding_function=embedding_model,
-        persist_directory="chroma_db_books"
-    )
+    if os.path.exists("faiss_index/index.faiss") and os.path.exists("faiss_index/index.pkl"):
+        return FAISS.load_local("faiss_index", embedding_model)
 
-db_books = load_chroma()
+    st.warning("Vector database not found. Building FAISS index now...")
+
+    tagged_lines = books["isbn13"].astype(str) + " " + books["description"].fillna("")
+    documents = [Document(page_content=line.strip()) for line in tagged_lines if line.strip()]
+
+    db = FAISS.from_documents(documents, embedding_model)
+    db.save_local("faiss_index")
+    return db
+
+db_books = load_faiss()
+
 
 def retrieve_semantic_recommendations(query, category=None, tone=None, initial_top_k=50, final_top_k=16):
     recs = db_books.similarity_search(query, k=initial_top_k)
