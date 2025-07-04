@@ -17,7 +17,6 @@ from langchain_core.documents import Document
 
 st.set_page_config(page_title="📚 AI-Powered Book Discovery", layout="wide")
 st.title("📚 AI-Powered Book Discovery Platform")
-st.write("Find books based on semantic meaning and emotional tone.")
 
 def load_books():
     books = pd.read_csv("books_with_emotions.csv")
@@ -70,15 +69,15 @@ def retrieve_semantic_recommendations(query=None, category=None, tone=None, init
     return book_recs.head(final_top_k)
 
 # ---------------- UI ----------------
-query = st.text_input("Enter a book description (optional):")
+query = st.text_input("Enter a book description:", placeholder="e.g., A story about forgiveness")
 categories = ["All"] + sorted(books["simple_categories"].dropna().unique())
 tones = ["All", "Happy", "Surprising", "Angry", "Suspenseful", "Sad"]
 
 col1, col2 = st.columns(2)
 with col1:
-    category = st.selectbox("Filter by category:", categories)
+    category = st.selectbox("Select a category:", categories)
 with col2:
-    tone = st.selectbox("Filter by emotional tone:", tones)
+    tone = st.selectbox("Select an emotional tone:", tones)
 
 if st.button("🔍 Find Recommendations"):
     if not query and category == "All" and tone == "All":
