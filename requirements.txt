@@ -1,8 +1,9 @@
+protobuf==3.20.3
 langchain
 langchain-community
 sentence-transformers
-faiss-cpu
 pandas
 numpy
 streamlit
 python-dotenv
+faiss-cpu
