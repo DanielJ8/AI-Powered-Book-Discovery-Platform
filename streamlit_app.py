@@ -35,7 +35,7 @@ books = load_books()
 def load_faiss():
     embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     if os.path.exists("faiss_index/index.faiss") and os.path.exists("faiss_index/index.pkl"):
-        return FAISS.load_local("faiss_index", embedding_model)
+        return FAISS.load_local("faiss_index", embedding_model, allow_dangerous_deserialization=True)
 
     tagged_lines = books["isbn13"].astype(str) + " " + books["description"].fillna("")
     documents = [Document(page_content=line.strip()) for line in tagged_lines if line.strip()]
@@ -43,7 +43,6 @@ def load_faiss():
     db = FAISS.from_documents(documents, embedding_model)
     db.save_local("faiss_index")
     return db
-
 db_books = load_faiss()
 
 def retrieve_semantic_recommendations(query=None, category=None, tone=None, initial_top_k=50, final_top_k=16):
