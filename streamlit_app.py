@@ -19,7 +19,6 @@ st.set_page_config(page_title="📚 AI-Powered Book Discovery", layout="wide")
 st.title("📚 AI-Powered Book Discovery Platform")
 st.write("Find books based on semantic meaning and emotional tone.")
 
-
 def load_books():
     books = pd.read_csv("books_with_emotions.csv")
     books["large_thumbnail"] = books["thumbnail"].fillna("") + "&fife=w800"
@@ -32,15 +31,11 @@ def load_books():
 
 books = load_books()
 
-
 @st.cache_resource
 def load_faiss():
     embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
     if os.path.exists("faiss_index/index.faiss") and os.path.exists("faiss_index/index.pkl"):
         return FAISS.load_local("faiss_index", embedding_model)
-
-    st.warning("Vector database not found. Building FAISS index now...")
 
     tagged_lines = books["isbn13"].astype(str) + " " + books["description"].fillna("")
     documents = [Document(page_content=line.strip()) for line in tagged_lines if line.strip()]
@@ -51,31 +46,32 @@ def load_faiss():
 
 db_books = load_faiss()
 
-
-def retrieve_semantic_recommendations(query, category=None, tone=None, initial_top_k=50, final_top_k=16):
-    recs = db_books.similarity_search(query, k=initial_top_k)
-    books_list = [int(rec.page_content.strip('"').split()[0]) for rec in recs]
-    book_recs = books[books["isbn13"].isin(books_list)].head(initial_top_k)
-
-    if category != "All":
-        book_recs = book_recs[book_recs["simple_categories"] == category].head(final_top_k)
+def retrieve_semantic_recommendations(query=None, category=None, tone=None, initial_top_k=50, final_top_k=16):
+    if query:
+        recs = db_books.similarity_search(query, k=initial_top_k)
+        books_list = [int(rec.page_content.strip('"').split()[0]) for rec in recs]
+        book_recs = books[books["isbn13"].isin(books_list)].copy()
     else:
-        book_recs = book_recs.head(final_top_k)
+        book_recs = books.copy()
 
-    if tone == "Happy":
-        book_recs = book_recs.sort_values(by="joy", ascending=False)
-    elif tone == "Surprising":
-        book_recs = book_recs.sort_values(by="surprise", ascending=False)
-    elif tone == "Angry":
-        book_recs = book_recs.sort_values(by="anger", ascending=False)
-    elif tone == "Suspenseful":
-        book_recs = book_recs.sort_values(by="fear", ascending=False)
-    elif tone == "Sad":
-        book_recs = book_recs.sort_values(by="sadness", ascending=False)
+    if category and category != "All":
+        book_recs = book_recs[book_recs["simple_categories"] == category]
 
-    return book_recs
+    if tone and tone != "All":
+        tone_column = {
+            "Happy": "joy",
+            "Surprising": "surprise",
+            "Angry": "anger",
+            "Suspenseful": "fear",
+            "Sad": "sadness"
+        }.get(tone)
+        if tone_column:
+            book_recs = book_recs.sort_values(by=tone_column, ascending=False)
 
-query = st.text_input("Enter a book description (e.g., A story about courage and survival):")
+    return book_recs.head(final_top_k)
+
+# ---------------- UI ----------------
+query = st.text_input("Enter a book description (optional):")
 categories = ["All"] + sorted(books["simple_categories"].dropna().unique())
 tones = ["All", "Happy", "Surprising", "Angry", "Suspenseful", "Sad"]
 
@@ -86,8 +82,8 @@ with col2:
     tone = st.selectbox("Filter by emotional tone:", tones)
 
 if st.button("🔍 Find Recommendations"):
-    if not query.strip():
-        st.error("Please enter a book description to search.")
+    if not query and category == "All" and tone == "All":
+        st.warning("Please enter a description or select at least one filter.")
     else:
         with st.spinner("🔎 Searching for books..."):
             recommendations = retrieve_semantic_recommendations(query, category, tone)
@@ -98,7 +94,7 @@ if st.button("🔍 Find Recommendations"):
             for _, row in recommendations.iterrows():
                 col1, col2 = st.columns([1, 4])
                 with col1:
-                    st.image(row["large_thumbnail"], use_column_width=True)
+                    st.image(row["large_thumbnail"], use_container_width=True)
                 with col2:
                     authors_split = row["authors"].split(";")
                     if len(authors_split) == 2:
