@@ -7,8 +7,6 @@ Original file is located at
     https://colab.research.google.com/drive/197CkMrwMiEbRO0YGglnfWZGwEkiNNHZG
 """
 
-# app.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -18,16 +16,12 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import CharacterTextSplitter
 
-# ----------------------------
-# CONFIG & PAGE SETTINGS
-# ----------------------------
+
 st.set_page_config(page_title="📚 AI-Powered Book Discovery", layout="wide")
 st.title("📚 AI-Powered Book Discovery Platform")
 st.write("Find books based on semantic meaning and emotional tone.")
 
-# ----------------------------
-# LOAD DATA
-# ----------------------------
+
 @st.cache_data
 def load_books():
     books = pd.read_csv("books_with_emotions.csv")
@@ -41,45 +35,19 @@ def load_books():
 
 books = load_books()
 
-# ----------------------------
-# LOAD / CREATE CHROMA VECTOR DB
-# ----------------------------
 @st.cache_resource
 def load_chroma():
     embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-    if not os.path.exists("chroma_db_books"):
-        st.warning("Vector database not found. Creating it now (may take a few minutes)...")
-
-        # Create the text content to be split by newlines
-        tagged_lines = books["isbn13"].astype(str) + " " + books["description"].fillna("")
-        with open("tagged_description.txt", "w", encoding="utf-8") as f:
-            f.write("\n".join(tagged_lines.tolist()))
-
-        # Load and split by newlines manually
-        from langchain_community.document_loaders import TextLoader
-        from langchain_core.documents import Document
-
-        loader = TextLoader("tagged_description.txt", encoding="utf-8")
-        raw_docs = loader.load()
-        text_content = raw_docs[0].page_content
-        documents = [Document(page_content=line.strip()) for line in text_content.split("\n") if line.strip()]
-
-        db = Chroma.from_documents(documents, embedding=embedding_model, persist_directory="chroma_db_books")
-        db.persist()
-        return db
-    else:
-        return Chroma(
-            collection_name="book_collection",
-            embedding_function=embedding_model,
-            persist_directory="chroma_db_books"
-        )
+    # Load prebuilt Chroma vector store only
+    return Chroma(
+        collection_name="book_collection",
+        embedding_function=embedding_model,
+        persist_directory="chroma_db_books"
+    )
 
 db_books = load_chroma()
 
-# ----------------------------
-# SEMANTIC SEARCH LOGIC
-# ----------------------------
 def retrieve_semantic_recommendations(query, category=None, tone=None, initial_top_k=50, final_top_k=16):
     recs = db_books.similarity_search(query, k=initial_top_k)
     books_list = [int(rec.page_content.strip('"').split()[0]) for rec in recs]
@@ -103,9 +71,6 @@ def retrieve_semantic_recommendations(query, category=None, tone=None, initial_t
 
     return book_recs
 
-# ----------------------------
-# UI INTERFACE
-# ----------------------------
 query = st.text_input("Enter a book description (e.g., A story about courage and survival):")
 categories = ["All"] + sorted(books["simple_categories"].dropna().unique())
 tones = ["All", "Happy", "Surprising", "Angry", "Suspenseful", "Sad"]
