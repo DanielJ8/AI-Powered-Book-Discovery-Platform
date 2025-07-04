@@ -1,8 +1,7 @@
-protobuf==3.20.3
 langchain
 langchain-community
-chromadb
 sentence-transformers
+faiss-cpu
 pandas
 numpy
 streamlit
